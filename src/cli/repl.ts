@@ -80,9 +80,9 @@ async function handleCommand(
       printConversationList(await app.listConversations());
       return false;
     case "load": {
-      requireArg(args, "/load <id>");
+      requireArg(args, "/load <id-or-title>");
       const conversation = await app.loadConversation(args);
-      console.log(chalk.dim(`Loaded ${conversation.id}: ${conversation.title}`));
+      console.log(chalk.dim(`Loaded: ${conversation.title}`));
       printContextEstimate(app.contextEstimate());
       return false;
     }

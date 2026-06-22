@@ -6,7 +6,7 @@ A persistent terminal chat interface for local Ollama models. It talks directly 
 
 - Node.js 20 or newer
 - npm
-- Ollama installed and running locally at `http://localhost:11434`
+- Ollama installed
 - At least one installed model, for example:
 
 ```sh
@@ -38,6 +38,13 @@ Start the TUI:
 hearth
 ```
 
+`hearth` starts Ollama if needed and opens a new chat using the remembered model when possible. To return to existing work:
+
+```sh
+hearth --continue
+hearth --resume <id-or-title>
+```
+
 The screen is split into:
 
 - A bordered output box for conversation history and streamed responses.
@@ -61,10 +68,10 @@ hearth --help
 ## Slash Commands
 
 - `/help`: Show available commands.
-- `/models`: List installed Ollama models.
-- `/new [model]`: Start a new conversation. If no model is supplied, the first installed Ollama model is used.
-- `/list`: List saved conversations.
-- `/load <id>`: Load a saved conversation.
+- `/models`: Open an arrow-key picker for installed Ollama models.
+- `/new [model]`: Start another conversation. If no model is supplied, the remembered model is used first.
+- `/list`: Open an arrow-key picker for saved conversations.
+- `/load <id-or-title>`: Load a saved conversation by compact ID or title.
 - `/save`: Save the current conversation.
 - `/model <name>`: Switch the active model after validating it exists in Ollama.
 - `/system [prompt]`: Set the system prompt. Use `/system clear` to remove it.
@@ -85,19 +92,23 @@ Set `OLLAMA_TERMINAL_CHAT_HOME` to use a different data directory.
 
 ## Manual QA Script
 
-1. Run `ollama serve` if Ollama is not already running.
-2. Run `hearth models` and confirm installed models are listed.
-3. Run `hearth`, then `/new <model>`.
+1. Run `hearth models` and confirm installed models are listed.
+2. Run `hearth` and confirm a new chat starts automatically.
+3. Run `/new <model>` and confirm another conversation starts.
 4. Confirm the bordered output box, input box, and status line render.
 5. Send a normal chat message and confirm the response streams inside the output box.
 6. Resize the terminal and confirm the boxes remain intact.
-7. Exit with `/exit`, restart `hearth`, then `/list` and `/load <id>`.
-8. Confirm the previous messages are still present in the JSON file.
-9. Run `/model <another-installed-model>` and confirm the status line updates.
-10. Run `/system You are concise.` and confirm the saved JSON includes the prompt.
-11. Run `/search <word-from-earlier-message>` and confirm the conversation is returned.
-12. Run `/regen` and confirm the last assistant response is replaced.
-13. Run `/edit`, update the prefilled message, and confirm history reloads coherently.
+7. Exit with `/exit`, restart `hearth`, and confirm a new chat uses the remembered model.
+8. Run `hearth --continue` and confirm the latest conversation loads.
+9. Run `hearth --resume <id-or-title>` and confirm the referenced conversation loads.
+10. Run `/list`, select a conversation with arrow keys, and press Enter.
+11. Confirm the previous messages are still present in the JSON file.
+12. Run `/models`, select another model with arrow keys, and confirm the status line updates.
+13. Run `/model <another-installed-model>` and confirm typed switching still works.
+14. Run `/system You are concise.` and confirm the saved JSON includes the prompt.
+15. Run `/search <word-from-earlier-message>` and confirm the conversation is returned.
+16. Run `/regen` and confirm the last assistant response is replaced.
+17. Run `/edit`, update the prefilled message, and confirm history reloads coherently.
 
 ## Development
 

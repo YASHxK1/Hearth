@@ -30,6 +30,57 @@ describe("ConversationRepository", () => {
     expect(JSON.parse(raw).id).toBe(conversation.id);
   });
 
+  it("loads conversations by exact or partial title", async () => {
+    const dir = await tempDir();
+    const repository = new ConversationRepository(dir);
+    const conversation = createConversation("llama3.2");
+    appendMessage(conversation, "user", "Explain recursion in simple terms");
+
+    await repository.save(conversation);
+
+    await expect(repository.loadByReference("Explain recursion in simple terms")).resolves.toMatchObject({
+      id: conversation.id
+    });
+    await expect(repository.loadByReference("recursion")).resolves.toMatchObject({
+      id: conversation.id
+    });
+  });
+
+  it("loads conversations by full ID or unique ID prefix", async () => {
+    const dir = await tempDir();
+    const repository = new ConversationRepository(dir);
+    const conversation = createConversation("llama3.2");
+    conversation.id = "conv_6794fa16-a111-4000-9000-000000000001";
+    appendMessage(conversation, "user", "Prefix loading");
+
+    await repository.save(conversation);
+
+    await expect(repository.loadByReference(conversation.id)).resolves.toMatchObject({
+      id: conversation.id
+    });
+    await expect(repository.loadByReference("conv_6794fa16-")).resolves.toMatchObject({
+      id: conversation.id
+    });
+  });
+
+  it("rejects ambiguous ID prefixes", async () => {
+    const dir = await tempDir();
+    const repository = new ConversationRepository(dir);
+    const first = createConversation("llama3.2");
+    const second = createConversation("llama3.2");
+    first.id = "conv_6794fa16-a111-4000-9000-000000000001";
+    second.id = "conv_6794fa16-b222-4000-9000-000000000002";
+    appendMessage(first, "user", "First duplicate prefix");
+    appendMessage(second, "user", "Second duplicate prefix");
+
+    await repository.save(first);
+    await repository.save(second);
+
+    await expect(repository.loadByReference("conv_6794fa16-")).rejects.toThrow(
+      "Multiple conversations match"
+    );
+  });
+
   it("rejects invalid conversation files", async () => {
     const dir = await tempDir();
     const repository = new ConversationRepository(dir);

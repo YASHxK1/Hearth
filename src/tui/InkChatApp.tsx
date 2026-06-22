@@ -9,33 +9,50 @@ import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { InputBox } from "./components/InputBox.js";
 import { OutputBox } from "./components/OutputBox.js";
 import { StatusLine } from "./components/StatusLine.js";
+import { PickerBox, type PickerItem } from "./components/PickerBox.js";
 import {
   errorMessage,
+  formatConversationPickerRows,
   formatConversationList,
   formatHelp,
+  formatModelPickerRows,
   formatModels,
   formatSearchMatches,
   fromMessages,
   notice,
   type DisplayMessage,
-  type EditMode,
+  type TuiMode,
   type TuiStatus
 } from "./state.js";
+import type { ConversationSummary } from "../storage/schema.js";
+import type { OllamaModel } from "../ollama/types.js";
 
 type InkChatAppProps = {
   app?: ChatApp;
+  startupMode?: TuiStartupMode;
 };
 
-export function InkChatApp({ app: providedApp }: InkChatAppProps) {
+export type TuiStartupMode =
+  | { type: "none" }
+  | { type: "new" }
+  | { type: "continue" }
+  | { type: "resume"; reference: string };
+
+const DEFAULT_STARTUP_MODE: TuiStartupMode = { type: "none" };
+
+export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MODE }: InkChatAppProps) {
   const app = useMemo(() => providedApp ?? new ChatApp(), [providedApp]);
   const { exit } = useApp();
   const terminal = useTerminalSize();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [mode, setMode] = useState<EditMode>("chat");
+  const [mode, setMode] = useState<TuiMode>("chat");
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeModel, setActiveModel] = useState<string | undefined>();
   const [contextEstimate, setContextEstimate] = useState<TuiStatus["contextEstimate"]>();
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [modelOptions, setModelOptions] = useState<OllamaModel[]>([]);
+  const [conversationOptions, setConversationOptions] = useState<ConversationSummary[]>([]);
 
   const appendMessage = useCallback((message: DisplayMessage) => {
     setMessages((current) => [...current, message]);
@@ -70,7 +87,7 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
   const syncFromConversation = useCallback(
     (extraMessages: DisplayMessage[] = []) => {
       const conversation = app.currentConversation;
-      setActiveModel(conversation?.model);
+      setActiveModel(conversation?.model ?? app.rememberedModel);
       setContextEstimate(conversation ? estimateContextUsage(conversation) : undefined);
       setMessages([...fromMessages(conversation?.messages ?? []), ...extraMessages]);
     },
@@ -80,15 +97,103 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
   useEffect(() => {
     app
       .init()
-      .then(() => {
-        appendMessage(notice("Ready. Use /new to begin, /help for commands, /exit to leave."));
+      .then(async () => {
+        const startupNotice = await applyStartupMode(app, startupMode);
+        syncFromConversation([notice(startupNotice)]);
       })
       .catch((error: unknown) => {
         appendMessage(errorMessage((error as Error).message));
+        syncStatusOnly(app, setActiveModel, setContextEstimate);
       });
-  }, [app, appendMessage]);
+  }, [app, appendMessage, startupMode, syncFromConversation]);
+
+  const closePicker = useCallback(() => {
+    setMode("chat");
+    setSelectedIndex(0);
+    setModelOptions([]);
+    setConversationOptions([]);
+  }, []);
+
+  const selectModel = useCallback(
+    async (model: OllamaModel) => {
+      const modelName = model.name ?? model.model;
+      if (!modelName) {
+        appendMessage(errorMessage("Selected model is invalid."));
+        return;
+      }
+
+      if (app.currentConversation) {
+        await app.switchModel(modelName);
+        closePicker();
+        syncFromConversation([notice(`Selected model: ${modelName}`)]);
+      } else {
+        await app.setDefaultModel(modelName);
+        setActiveModel(app.rememberedModel);
+        setContextEstimate(undefined);
+        closePicker();
+        appendMessage(notice(`Selected model: ${modelName}`));
+      }
+    },
+    [app, appendMessage, closePicker, syncFromConversation]
+  );
+
+  const selectConversation = useCallback(
+    async (conversation: ConversationSummary) => {
+      const loaded = await app.loadConversation(conversation.id);
+      closePicker();
+      syncFromConversation([notice(`Loaded: ${loaded.title}`)]);
+    },
+    [app, closePicker, syncFromConversation]
+  );
 
   useInput((_, key) => {
+    if (mode === "select-model" || mode === "select-conversation") {
+      const optionsLength = mode === "select-model" ? modelOptions.length : conversationOptions.length;
+
+      if (key.escape) {
+        closePicker();
+        appendMessage(notice("Selection cancelled."));
+        return;
+      }
+
+      if (optionsLength === 0) {
+        return;
+      }
+
+      if (key.upArrow) {
+        setSelectedIndex((current) => (current - 1 + optionsLength) % optionsLength);
+        return;
+      }
+
+      if (key.downArrow) {
+        setSelectedIndex((current) => (current + 1) % optionsLength);
+        return;
+      }
+
+      if (key.return) {
+        if (mode === "select-model") {
+          const model = modelOptions[selectedIndex];
+          if (model) {
+            void selectModel(model).catch((error: unknown) => {
+              appendMessage(errorMessage((error as Error).message));
+              closePicker();
+              syncStatusOnly(app, setActiveModel, setContextEstimate);
+            });
+          }
+        } else {
+          const conversation = conversationOptions[selectedIndex];
+          if (conversation) {
+            void selectConversation(conversation).catch((error: unknown) => {
+              appendMessage(errorMessage((error as Error).message));
+              closePicker();
+              syncStatusOnly(app, setActiveModel, setContextEstimate);
+            });
+          }
+        }
+      }
+      return;
+    }
+
     if (key.escape && mode === "edit-user") {
       setMode("chat");
       setInput("");
@@ -99,7 +204,7 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
   const submit = useCallback(
     async (value: string) => {
       const trimmed = value.trim();
-      if (!trimmed || isStreaming) {
+      if (!trimmed || isStreaming || mode === "select-model" || mode === "select-conversation") {
         return;
       }
 
@@ -122,6 +227,9 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
             setMode,
             setMessages,
             setIsStreaming,
+            setSelectedIndex,
+            setModelOptions,
+            setConversationOptions,
             appendMessage,
             stream,
             syncFromConversation
@@ -161,15 +269,24 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
     isStreaming
   };
 
-  const outputHeight = Math.max(8, terminal.rows - 5);
+  const picker = pickerForMode(mode, selectedIndex, modelOptions, conversationOptions);
+  const outputHeight = Math.max(6, terminal.rows - (picker ? 10 : 5));
 
   return (
     <Box flexDirection="column" width={terminal.columns}>
       <OutputBox messages={messages} height={outputHeight} />
+      {picker ? (
+        <PickerBox
+          title={picker.title}
+          items={picker.items}
+          selectedIndex={selectedIndex}
+          emptyText={picker.emptyText}
+        />
+      ) : null}
       <InputBox
         value={input}
         mode={mode}
-        isDisabled={isStreaming}
+        isDisabled={isStreaming || mode === "select-model" || mode === "select-conversation"}
         onChange={setInput}
         onSubmit={submit}
       />
@@ -178,14 +295,40 @@ export function InkChatApp({ app: providedApp }: InkChatAppProps) {
   );
 }
 
+async function applyStartupMode(app: ChatApp, startupMode: TuiStartupMode): Promise<string> {
+  switch (startupMode.type) {
+    case "new": {
+      const conversation = await app.startDefaultConversation();
+      return `Started ${conversation.id} with ${conversation.model}.`;
+    }
+    case "continue": {
+      await app.ensureOllamaRunning();
+      const conversation = await app.continueLatestConversation();
+      return `Loaded latest: ${conversation.title}`;
+    }
+    case "resume": {
+      await app.ensureOllamaRunning();
+      const conversation = await app.resumeConversation(startupMode.reference);
+      return `Loaded: ${conversation.title}`;
+    }
+    case "none":
+      return app.currentConversation
+        ? `Ready with ${app.currentConversation.model}.`
+        : "Ready. Use /new to begin, /help for commands, /exit to leave.";
+  }
+}
+
 type CommandContext = {
   app: ChatApp;
   name: string;
   args: string;
   setInput: (value: string) => void;
-  setMode: (mode: EditMode) => void;
+  setMode: (mode: TuiMode) => void;
   setMessages: React.Dispatch<React.SetStateAction<DisplayMessage[]>>;
   setIsStreaming: (value: boolean) => void;
+  setSelectedIndex: (value: number) => void;
+  setModelOptions: (value: OllamaModel[]) => void;
+  setConversationOptions: (value: ConversationSummary[]) => void;
   appendMessage: (message: DisplayMessage) => void;
   stream: ReturnType<typeof useBatchedStream>;
   syncFromConversation: (extraMessages?: DisplayMessage[]) => void;
@@ -199,7 +342,7 @@ async function handleCommand(context: CommandContext): Promise<boolean> {
       appendMessage(notice(formatHelp()));
       return false;
     case "models":
-      appendMessage(notice(formatModels(await app.listModels())));
+      await openModelPicker(context);
       return false;
     case "new": {
       const conversation = await app.startNew(args || undefined);
@@ -207,12 +350,12 @@ async function handleCommand(context: CommandContext): Promise<boolean> {
       return false;
     }
     case "list":
-      appendMessage(notice(formatConversationList(await app.listConversations())));
+      await openConversationPicker(context);
       return false;
     case "load": {
-      requireArg(args, "/load <id>");
+      requireArg(args, "/load <id-or-title>");
       const conversation = await app.loadConversation(args);
-      syncFromConversation([notice(`Loaded ${conversation.id}: ${conversation.title}`)]);
+      syncFromConversation([notice(`Loaded: ${conversation.title}`)]);
       return false;
     }
     case "save":
@@ -356,8 +499,82 @@ function syncStatusOnly(
   setContextEstimate: (value: TuiStatus["contextEstimate"]) => void
 ): void {
   const conversation = app.currentConversation;
-  setActiveModel(conversation?.model);
+  setActiveModel(conversation?.model ?? app.rememberedModel);
   setContextEstimate(conversation ? estimateContextUsage(conversation) : undefined);
+}
+
+async function openModelPicker({
+  app,
+  setSelectedIndex,
+  setModelOptions,
+  setConversationOptions,
+  setMode,
+  appendMessage
+}: CommandContext): Promise<void> {
+  const models = await app.listModels();
+  if (models.length === 0) {
+    appendMessage(notice(formatModels(models)));
+    return;
+  }
+
+  setConversationOptions([]);
+  setModelOptions(models);
+  setSelectedIndex(0);
+  setMode("select-model");
+}
+
+async function openConversationPicker({
+  app,
+  setSelectedIndex,
+  setModelOptions,
+  setConversationOptions,
+  setMode,
+  appendMessage
+}: CommandContext): Promise<void> {
+  const conversations = await app.listConversations();
+  if (conversations.length === 0) {
+    appendMessage(notice(formatConversationList(conversations)));
+    return;
+  }
+
+  setModelOptions([]);
+  setConversationOptions(conversations);
+  setSelectedIndex(0);
+  setMode("select-conversation");
+}
+
+function pickerForMode(
+  mode: TuiMode,
+  selectedIndex: number,
+  modelOptions: OllamaModel[],
+  conversationOptions: ConversationSummary[]
+):
+  | {
+      title: string;
+      items: PickerItem[];
+      selectedIndex: number;
+      emptyText: string;
+    }
+  | undefined {
+  if (mode === "select-model") {
+    return {
+      title: "Select model",
+      selectedIndex,
+      emptyText: "No Ollama models installed.",
+      items: formatModelPickerRows(modelOptions).map((label) => ({ label }))
+    };
+  }
+
+  if (mode === "select-conversation") {
+    return {
+      title: "Select conversation",
+      selectedIndex,
+      emptyText: "No saved conversations yet.",
+      items: formatConversationPickerRows(conversationOptions).map((label) => ({ label }))
+    };
+  }
+
+  return undefined;
 }
 
 function removeLastAssistant(messages: DisplayMessage[]): DisplayMessage[] {
@@ -387,7 +604,7 @@ function removeMessagesAfterLastUser(messages: Conversation["messages"], replace
 
 function ensureConversation(conversation: Conversation | undefined): asserts conversation is Conversation {
   if (!conversation) {
-    throw new Error("No active conversation. Use /new [model] or /load <id> first.");
+    throw new Error("No active conversation. Use /new [model] or /load <id-or-title> first.");
   }
 }
 

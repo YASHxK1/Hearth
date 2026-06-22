@@ -1,18 +1,23 @@
 import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
-import type { EditMode } from "../state.js";
+import type { TuiMode } from "../state.js";
 
 type InputBoxProps = {
   value: string;
-  mode: EditMode;
+  mode: TuiMode;
   isDisabled: boolean;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
 };
 
 export function InputBox({ value, mode, isDisabled, onChange, onSubmit }: InputBoxProps) {
-  const placeholder = mode === "edit-user" ? "Edit last message..." : "Ask anything...";
+  const placeholder =
+    mode === "edit-user"
+      ? "Edit last message..."
+      : mode === "select-model" || mode === "select-conversation"
+        ? "Use picker above..."
+        : "Ask anything...";
 
   return (
     <Box borderStyle="round" paddingX={1} height={3}>

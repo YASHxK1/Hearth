@@ -13,15 +13,18 @@ import type { ContextEstimate } from "./context-usage.js";
 import { OllamaClient } from "../ollama/client.js";
 import type { OllamaModel } from "../ollama/types.js";
 import { ConversationRepository } from "../storage/repository.js";
+import { PreferencesRepository } from "../storage/preferences.js";
 import type { Conversation, ConversationSummary } from "../storage/schema.js";
 import { searchConversations, type SearchMatch } from "../search/search.js";
 
 export class ChatApp {
   private conversation?: Conversation;
+  private lastModel?: string;
 
   constructor(
     private readonly ollama = new OllamaClient(),
-    private readonly repository = new ConversationRepository()
+    private readonly repository = new ConversationRepository(),
+    private readonly preferences = new PreferencesRepository()
   ) {}
 
   get currentConversation(): Conversation | undefined {
@@ -32,12 +35,39 @@ export class ChatApp {
     return [...(this.conversation?.messages ?? [])];
   }
 
+  get rememberedModel(): string | undefined {
+    return this.lastModel;
+  }
+
   async init(): Promise<void> {
     await this.repository.ensureReady();
+    const preferences = await this.preferences.load();
+    this.lastModel = preferences.lastModel;
   }
 
   async listModels(): Promise<OllamaModel[]> {
     return this.ollama.listModels();
+  }
+
+  async ensureOllamaRunning(): Promise<void> {
+    await this.ollama.listModels();
+  }
+
+  async startDefaultConversation(): Promise<Conversation> {
+    return this.startNew();
+  }
+
+  async continueLatestConversation(): Promise<Conversation> {
+    const [latest] = await this.repository.list();
+    if (!latest) {
+      throw new Error("No saved conversations found. Start a new chat with `hearth`.");
+    }
+
+    return this.loadConversation(latest.id);
+  }
+
+  async resumeConversation(reference: string): Promise<Conversation> {
+    return this.loadConversation(reference);
   }
 
   async startNew(model?: string): Promise<Conversation> {
@@ -45,6 +75,7 @@ export class ChatApp {
     await this.ollama.assertModelAvailable(selectedModel);
     this.conversation = createConversation(selectedModel);
     await this.repository.save(this.conversation);
+    await this.rememberModel(selectedModel);
     return this.conversation;
   }
 
@@ -52,8 +83,9 @@ export class ChatApp {
     return this.repository.list();
   }
 
-  async loadConversation(id: string): Promise<Conversation> {
-    this.conversation = await this.repository.load(id);
+  async loadConversation(reference: string): Promise<Conversation> {
+    this.conversation = await this.repository.loadByReference(reference);
+    await this.rememberModel(this.conversation.model);
     return this.conversation;
   }
 
@@ -67,6 +99,12 @@ export class ChatApp {
     await this.ollama.assertModelAvailable(model);
     setModel(conversation, model);
     await this.repository.save(conversation);
+    await this.rememberModel(model);
+  }
+
+  async setDefaultModel(model: string): Promise<void> {
+    await this.ollama.assertModelAvailable(model);
+    await this.rememberModel(model);
   }
 
   async setSystem(prompt?: string): Promise<void> {
@@ -141,7 +179,7 @@ export class ChatApp {
 
   private requireConversation(): Conversation {
     if (!this.conversation) {
-      throw new Error("No active conversation. Use /new [model] or /load <id> first.");
+      throw new Error("No active conversation. Use /new [model] or /load <id-or-title> first.");
     }
 
     return this.conversation;
@@ -149,11 +187,20 @@ export class ChatApp {
 
   private async defaultModel(): Promise<string> {
     const models = await this.ollama.listModels();
+    if (this.lastModel && models.some((model) => model.name === this.lastModel || model.model === this.lastModel)) {
+      return this.lastModel;
+    }
+
     const first = models[0]?.name ?? models[0]?.model;
     if (!first) {
       throw new Error("No Ollama models are installed. Run `ollama pull <model>` first.");
     }
 
     return first;
+  }
+
+  private async rememberModel(model: string): Promise<void> {
+    this.lastModel = model;
+    await this.preferences.save({ lastModel: model });
   }
 }

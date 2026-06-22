@@ -4,15 +4,16 @@ import { Lexer, type Tokens } from "marked";
 import type { ConversationSummary } from "../storage/schema.js";
 import type { ContextEstimate } from "../core/context-usage.js";
 import type { SearchMatch } from "../search/search.js";
+import { formatConversationReference } from "../core/conversation-reference.js";
 
 export function printHelp(): void {
   console.log(`
 ${chalk.bold("Commands")}
   /help                 Show this help.
-  /models               List installed Ollama models.
+  /models               Select an installed Ollama model in the TUI.
   /new [model]          Start a new conversation.
-  /list                 List saved conversations.
-  /load <id>            Load a saved conversation.
+  /list                 Select a saved conversation in the TUI.
+  /load <id-or-title>   Load a saved conversation.
   /save                 Save the current conversation.
   /model <name>         Switch the current conversation model.
   /system [prompt]      Set the system prompt. Use /system clear to remove it.
@@ -32,7 +33,7 @@ export function printConversationList(summaries: ConversationSummary[]): void {
 
   for (const summary of summaries) {
     console.log(
-      `${chalk.cyan(summary.id)}  ${chalk.bold(summary.title)}  ${chalk.dim(
+      `${chalk.cyan(formatConversationReference(summary.id))} ${chalk.bold(summary.title)}  ${chalk.dim(
         `${summary.model} | ${summary.messageCount} messages | ${formatDate(summary.updatedAt)}`
       )}`
     );
@@ -47,7 +48,7 @@ export function printSearchMatches(matches: SearchMatch[]): void {
 
   for (const match of matches) {
     console.log(
-      `${chalk.cyan(match.conversation.id)}  ${chalk.bold(match.conversation.title)}  ${chalk.dim(
+      `${chalk.cyan(formatConversationReference(match.conversation.id))} ${chalk.bold(match.conversation.title)}  ${chalk.dim(
         `${match.conversation.model} | ${formatDate(match.conversation.updatedAt)}`
       )}`
     );

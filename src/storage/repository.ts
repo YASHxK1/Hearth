@@ -28,6 +28,55 @@ export class ConversationRepository {
     return parsed;
   }
 
+  async loadByReference(reference: string): Promise<Conversation> {
+    const trimmed = reference.trim();
+    if (!trimmed) {
+      throw new Error("Conversation reference is required.");
+    }
+
+    if (await this.exists(trimmed)) {
+      return this.load(trimmed);
+    }
+
+    const conversations = await this.readAll();
+
+    if (looksLikeConversationId(trimmed)) {
+      return matchByIdPrefix(conversations, trimmed);
+    }
+
+    const normalized = normalizeTitle(trimmed);
+    const exactMatches = conversations.filter(
+      (conversation) => normalizeTitle(conversation.title) === normalized
+    );
+
+    if (exactMatches.length === 1) {
+      return exactMatches[0]!;
+    }
+
+    if (exactMatches.length > 1) {
+      throw new Error(
+        `Multiple conversations are titled "${trimmed}". Use the short ID shown in /list.`
+      );
+    }
+
+    const partialMatches = conversations.filter((conversation) =>
+      normalizeTitle(conversation.title).includes(normalized)
+    );
+
+    if (partialMatches.length === 1) {
+      return partialMatches[0]!;
+    }
+
+    if (partialMatches.length > 1) {
+      const titles = partialMatches
+        .map((conversation) => `- ${conversation.title} (${conversation.id})`)
+        .join("\n");
+      throw new Error(`Multiple conversations match "${trimmed}":\n${titles}`);
+    }
+
+    throw new Error(`No conversation found with title matching "${trimmed}".`);
+  }
+
   async list(): Promise<ConversationSummary[]> {
     const conversations = await this.readAll();
     return conversations
@@ -77,6 +126,15 @@ export class ConversationRepository {
 
     return join(this.conversationsDir, `${safeId}.json`);
   }
+
+  private async exists(id: string): Promise<boolean> {
+    try {
+      await stat(this.pathFor(id));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 function parseConversation(raw: string, path: string): Conversation {
@@ -92,4 +150,29 @@ function parseConversation(raw: string, path: string): Conversation {
   }
 
   return parsed;
+}
+
+function normalizeTitle(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function looksLikeConversationId(value: string): boolean {
+  return value.startsWith("conv_");
+}
+
+function matchByIdPrefix(conversations: Conversation[], prefix: string): Conversation {
+  const matches = conversations.filter((conversation) => conversation.id.startsWith(prefix));
+
+  if (matches.length === 1) {
+    return matches[0]!;
+  }
+
+  if (matches.length > 1) {
+    const choices = matches
+      .map((conversation) => `- ${conversation.id} (${conversation.title})`)
+      .join("\n");
+    throw new Error(`Multiple conversations match "${prefix}". Use a longer ID:\n${choices}`);
+  }
+
+  throw new Error(`No conversation found with ID matching "${prefix}".`);
 }

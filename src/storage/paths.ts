@@ -8,3 +8,7 @@ export function getDataDir(): string {
 export function getConversationsDir(dataDir = getDataDir()): string {
   return join(dataDir, "conversations");
 }
+
+export function getPreferencesPath(dataDir = getDataDir()): string {
+  return join(dataDir, "preferences.json");
+}
