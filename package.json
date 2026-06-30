@@ -11,6 +11,8 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "dev": "tsx src/index.ts",
+    "ollama:start:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-ollama-hidden.ps1",
+    "ollama:start:unix": "sh ./scripts/start-ollama-background.sh",
     "test": "vitest run --pool=threads",
     "typecheck": "tsc --noEmit"
   },

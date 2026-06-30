@@ -20,7 +20,14 @@ For local development:
 ```sh
 npm install
 npm run build
+npm run ollama:start:unix
 npm run dev
+```
+
+On Windows, start Ollama with:
+
+```powershell
+npm run ollama:start:windows
 ```
 
 To install globally from this checkout:
@@ -38,7 +45,7 @@ Start the TUI:
 hearth
 ```
 
-`hearth` starts Ollama if needed and opens a new chat using the remembered model when possible. To return to existing work:
+Start Ollama first with `npm run ollama:start:windows` on Windows or `npm run ollama:start:unix` on Linux/macOS. Then `hearth` opens a new chat using the remembered model when possible. To return to existing work:
 
 ```sh
 hearth --continue
@@ -92,23 +99,24 @@ Set `OLLAMA_TERMINAL_CHAT_HOME` to use a different data directory.
 
 ## Manual QA Script
 
-1. Run `hearth models` and confirm installed models are listed.
-2. Run `hearth` and confirm a new chat starts automatically.
-3. Run `/new <model>` and confirm another conversation starts.
-4. Confirm the bordered output box, input box, and status line render.
-5. Send a normal chat message and confirm the response streams inside the output box.
-6. Resize the terminal and confirm the boxes remain intact.
-7. Exit with `/exit`, restart `hearth`, and confirm a new chat uses the remembered model.
-8. Run `hearth --continue` and confirm the latest conversation loads.
-9. Run `hearth --resume <id-or-title>` and confirm the referenced conversation loads.
-10. Run `/list`, select a conversation with arrow keys, and press Enter.
-11. Confirm the previous messages are still present in the JSON file.
-12. Run `/models`, select another model with arrow keys, and confirm the status line updates.
-13. Run `/model <another-installed-model>` and confirm typed switching still works.
-14. Run `/system You are concise.` and confirm the saved JSON includes the prompt.
-15. Run `/search <word-from-earlier-message>` and confirm the conversation is returned.
-16. Run `/regen` and confirm the last assistant response is replaced.
-17. Run `/edit`, update the prefilled message, and confirm history reloads coherently.
+1. Start Ollama with the platform startup script.
+2. Run `hearth models` and confirm installed models are listed.
+3. Run `hearth` and confirm a new chat starts automatically.
+4. Run `/new <model>` and confirm another conversation starts.
+5. Confirm the bordered output box, input box, and status line render.
+6. Send a normal chat message and confirm the response streams inside the output box.
+7. Resize the terminal and confirm the boxes remain intact.
+8. Exit with `/exit`, restart `hearth`, and confirm a new chat uses the remembered model.
+9. Run `hearth --continue` and confirm the latest conversation loads.
+10. Run `hearth --resume <id-or-title>` and confirm the referenced conversation loads.
+11. Run `/list`, select a conversation with arrow keys, and press Enter.
+12. Confirm the previous messages are still present in the JSON file.
+13. Run `/models`, select another model with arrow keys, and confirm the status line updates.
+14. Run `/model <another-installed-model>` and confirm typed switching still works.
+15. Run `/system You are concise.` and confirm the saved JSON includes the prompt.
+16. Run `/search <word-from-earlier-message>` and confirm the conversation is returned.
+17. Run `/regen` and confirm the last assistant response is replaced.
+18. Run `/edit`, update the prefilled message, and confirm history reloads coherently.
 
 ## Development
 

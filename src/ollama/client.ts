@@ -1,4 +1,3 @@
-import { spawn as spawnProcess } from "node:child_process";
 import type {
   ChatStreamEvent,
   OllamaChatChunk,
@@ -7,15 +6,11 @@ import type {
 } from "./types.js";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
-const OLLAMA_START_TIMEOUT_MS = 10_000;
-const OLLAMA_POLL_INTERVAL_MS = 500;
-const OLLAMA_TIMEOUT_MESSAGE = "Ollama didn't start in time. Check it's installed and try again.";
+const OLLAMA_NOT_RUNNING_MESSAGE =
+  "Ollama is not running. Start it first with `scripts/start-ollama-hidden.ps1` on Windows or `scripts/start-ollama-background.sh` on Linux/macOS.";
 
 type EnsureOllamaOptions = {
   fetchImpl?: typeof fetch;
-  spawnImpl?: typeof spawnProcess;
-  timeoutMs?: number;
-  pollIntervalMs?: number;
 };
 
 export async function ensureOllamaRunning(
@@ -23,34 +18,12 @@ export async function ensureOllamaRunning(
   options: EnsureOllamaOptions = {}
 ): Promise<void> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const spawnImpl = options.spawnImpl ?? spawnProcess;
-  const timeoutMs = options.timeoutMs ?? OLLAMA_START_TIMEOUT_MS;
-  const pollIntervalMs = options.pollIntervalMs ?? OLLAMA_POLL_INTERVAL_MS;
 
   if (await canReachOllama(baseUrl, fetchImpl)) {
     return;
   }
 
-  try {
-    const child = spawnImpl("ollama", ["serve"], {
-      detached: true,
-      stdio: "ignore"
-    });
-    child.once?.("error", () => undefined);
-    child.unref();
-  } catch {
-    throw new Error(OLLAMA_TIMEOUT_MESSAGE);
-  }
-
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    await sleep(pollIntervalMs);
-    if (await canReachOllama(baseUrl, fetchImpl)) {
-      return;
-    }
-  }
-
-  throw new Error(OLLAMA_TIMEOUT_MESSAGE);
+  throw new Error(OLLAMA_NOT_RUNNING_MESSAGE);
 }
 
 export class OllamaClient {
@@ -91,7 +64,9 @@ export class OllamaClient {
         stream: true
       })
     }).catch((error: unknown) => {
-      throw new Error(`Could not reach Ollama at ${this.baseUrl}. Check it's installed and running.`);
+      throw new Error(
+        `Could not reach Ollama at ${this.baseUrl}. Start it first with scripts/start-ollama-hidden.ps1 on Windows or scripts/start-ollama-background.sh on Linux/macOS.`
+      );
     });
 
     if (!response.ok) {
@@ -109,7 +84,9 @@ export class OllamaClient {
   private async fetchJson(url: string): Promise<unknown> {
     await ensureOllamaRunning(this.baseUrl);
     const response = await fetch(url).catch((error: unknown) => {
-      throw new Error(`Could not reach Ollama at ${this.baseUrl}. Check it's installed and running.`);
+      throw new Error(
+        `Could not reach Ollama at ${this.baseUrl}. Start it first with scripts/start-ollama-hidden.ps1 on Windows or scripts/start-ollama-background.sh on Linux/macOS.`
+      );
     });
 
     if (!response.ok) {
@@ -128,10 +105,6 @@ async function canReachOllama(baseUrl: string, fetchImpl: typeof fetch): Promise
   } catch {
     return false;
   }
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function* parseOllamaStream(

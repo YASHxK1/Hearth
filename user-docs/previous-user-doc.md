@@ -22,8 +22,16 @@ ollama pull llama3.2
 
 Start Ollama if it is not already running:
 
+On Windows:
+
+```powershell
+.\scripts\start-ollama-hidden.ps1
+```
+
+On Linux/macOS:
+
 ```sh
-ollama serve
+./scripts/start-ollama-background.sh
 ```
 
 ## Install
@@ -243,13 +251,21 @@ OLLAMA_TERMINAL_CHAT_HOME=/path/to/folder
 If the app cannot reach Ollama:
 
 ```text
-Could not reach Ollama at http://localhost:11434
+Ollama is not running.
 ```
 
 Check that Ollama is running:
 
+On Windows:
+
+```powershell
+.\scripts\start-ollama-hidden.ps1
+```
+
+On Linux/macOS:
+
 ```sh
-ollama serve
+./scripts/start-ollama-background.sh
 ```
 
 If a model is missing:
@@ -278,6 +294,7 @@ npm install -g .
 3. Run `npm install`.
 4. Run `npm run build`.
 5. Run `npm install -g .`.
-6. Run `hearth`.
-7. Type `/new llama3.2`.
-8. Send your first message.
+6. Start Ollama with the platform startup script.
+7. Run `hearth`.
+8. Type `/new llama3.2`.
+9. Send your first message.

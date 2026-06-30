@@ -5,13 +5,19 @@
 You may see:
 
 ```text
-Could not reach Ollama at http://localhost:11434
+Ollama is not running.
 ```
 
-Fix:
+Fix on Windows:
 
 ```powershell
-ollama serve
+.\scripts\start-ollama-hidden.ps1
+```
+
+Fix on Linux/macOS:
+
+```sh
+./scripts/start-ollama-background.sh
 ```
 
 Then run the app again.
@@ -110,7 +116,7 @@ The automated tests do not require a live Ollama server.
 For live chat, verify:
 
 ```powershell
-ollama serve
+.\scripts\start-ollama-hidden.ps1
 ollama list
 ```
 

@@ -47,13 +47,27 @@ This creates the compiled CLI in `dist/`.
 
 ## Run In Development Mode
 
+Start Ollama first.
+
+On Windows:
+
+```powershell
+.\scripts\start-ollama-hidden.ps1
+```
+
+On Linux/macOS:
+
+```sh
+./scripts/start-ollama-background.sh
+```
+
 For everyday local development/testing:
 
 ```powershell
 npm run dev
 ```
 
-This starts Ollama if needed, creates a new chat, and opens the interactive TUI directly from the TypeScript source.
+This creates a new chat and opens the interactive TUI directly from the TypeScript source. Hearth expects Ollama to already be running at `http://localhost:11434`.
 
 ## Install As A Global Command
 
@@ -69,7 +83,7 @@ Then start the app from anywhere:
 hearth
 ```
 
-`hearth` starts Ollama if needed and creates a new chat automatically.
+`hearth` creates a new chat automatically. Start Ollama first with the platform script above.
 
 To load the most recently updated saved chat:
 

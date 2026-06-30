@@ -18,8 +18,16 @@ npm run build
 
 5. Start Ollama if needed:
 
+On Windows:
+
 ```powershell
-ollama serve
+.\scripts\start-ollama-hidden.ps1
+```
+
+On Linux/macOS:
+
+```sh
+./scripts/start-ollama-background.sh
 ```
 
 6. Install a model:
