@@ -1,124 +1,77 @@
 # Install And Run
 
-This guide assumes you are running the app from the project folder.
-
 ## Requirements
-
-You need:
 
 - Node.js 20 or newer
 - npm
-- Ollama installed
-- At least one Ollama model installed
+- Ollama, LM Studio, llama.cpp, OpenRouter, or OpenCode Zen with a chat model available
 
-Check Node:
+Install and build from the project folder:
 
-```powershell
-node --version
-```
-
-Check npm:
-
-```powershell
-npm --version
-```
-
-Check Ollama:
-
-```powershell
-ollama --version
-```
-
-## Install Dependencies
-
-From the project folder:
-
-```powershell
+```sh
 npm install
-```
-
-## Build The App
-
-```powershell
 npm run build
 ```
 
-This creates the compiled CLI in `dist/`.
+## Start A Model Server
 
-## Run In Development Mode
-
-Start Ollama first.
-
-On Windows:
+Ollama can be started with the included scripts:
 
 ```powershell
 .\scripts\start-ollama-hidden.ps1
 ```
 
-On Linux/macOS:
-
 ```sh
 ./scripts/start-ollama-background.sh
 ```
 
-For everyday local development/testing:
+For LM Studio, enable the server in the Developer tab or run:
 
-```powershell
-npm run dev
+```sh
+lms server start --port 1234
 ```
 
-This creates a new chat and opens the interactive TUI directly from the TypeScript source. Hearth expects Ollama to already be running at `http://localhost:11434`.
+For llama.cpp, run the `llama-server` executable with a GGUF model:
 
-## Install As A Global Command
-
-From the project folder:
-
-```powershell
-npm install -g .
+```sh
+llama-server -m /path/to/model.gguf --port 8080
 ```
 
-Then start the app from anywhere:
+## Run Hearth
 
-```powershell
-hearth
+```sh
+npm run dev -- --provider ollama
+npm run dev -- --provider lmstudio
+npm run dev -- --provider llamacpp
+npm run dev -- --provider openrouter
+npm run dev -- --provider opencodezen
 ```
 
-`hearth` creates a new chat automatically. Start Ollama first with the platform script above.
+The local defaults are ports 11434, 1234, and 8080 respectively. A custom URL is validated and remembered:
 
-To load the most recently updated saved chat:
-
-```powershell
-hearth --continue
+```sh
+npm run dev -- --provider lmstudio --base-url http://localhost:4321
 ```
 
-To load a specific saved chat by ID, short ID, or title:
+OpenRouter and OpenCode Zen need an API key, which is stored in your system keychain:
 
-```powershell
-hearth --resume <id-or-title>
+```sh
+npm run dev -- --provider openrouter --openrouter-api-key sk-or-v1-...
+npm run dev -- --provider opencodezen --opencodezen-api-key sk-zen-...
 ```
 
-## Install A Model
+You can also set or clear keys from inside the app with `/key <provider> [key]`.
 
-For example:
+Configure separate remote or Tailscale endpoints together:
 
-```powershell
-ollama pull llama3.2
+```sh
+hearth \
+  --ollama-base-url http://ollama-host.tailnet-name.ts.net:11434 \
+  --lmstudio-base-url http://lmstudio-host.tailnet-name.ts.net:1234 \
+  --llamacpp-base-url http://llamacpp-host.tailnet-name.ts.net:8080 \
+  --provider lmstudio
 ```
 
-List installed models:
+Provider-specific URL flags save their settings independently. The final `--provider` controls which provider starts active.
 
-```powershell
-ollama list
-```
-
-Inside the app, you can also run:
-
-```text
-/models
-```
-
-Start another chat inside the app:
-
-```text
-/new
-```
+Install globally with `npm install -g .`, then use `hearth`, `hearth --continue`, or `hearth --resume <id-or-title>`. Run `hearth models --provider <name>` to list models from a specific provider.

@@ -1,122 +1,127 @@
-# Ollama Terminal Chat
+# Hearth Local Model Chat
 
-A persistent terminal chat interface for local Ollama models. It talks directly to the local Ollama API, stores conversations as readable JSON files, and presents chat in a bordered terminal UI with a fixed input box and status line.
+Hearth is a persistent terminal chat interface for local models served by Ollama, LM Studio, or llama.cpp, plus the remote OpenRouter and OpenCode Zen APIs. It streams responses from the selected server or API, stores conversations as readable JSON, and presents chat in a bordered terminal UI.
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
-- Ollama installed
-- At least one installed model, for example:
-
-```sh
-ollama pull llama3.2
-```
+- One supported model server or API with a chat model available:
+  - Ollama
+  - LM Studio
+  - llama.cpp `llama-server`
+  - OpenRouter
+  - OpenCode Zen
 
 ## Install
-
-For local development:
 
 ```sh
 npm install
 npm run build
-npm run ollama:start:unix
-npm run dev
 ```
 
-On Windows, start Ollama with:
-
-```powershell
-npm run ollama:start:windows
-```
-
-To install globally from this checkout:
+For local development, run `npm run dev`. To install globally from this checkout:
 
 ```sh
 npm install -g .
 hearth
 ```
 
-## Usage
+## Choose A Provider
 
-Start the TUI:
+Hearth remembers the selected provider, its server URL, and its last-used model.
+
+```sh
+hearth --provider ollama
+hearth --provider lmstudio
+hearth --provider llamacpp
+hearth --provider openrouter
+hearth --provider opencodezen
+```
+
+Default server URLs are:
+
+- Ollama: `http://localhost:11434`
+- LM Studio: `http://localhost:1234`
+- llama.cpp: `http://localhost:8080`
+- OpenRouter: `https://openrouter.ai`
+- OpenCode Zen: `https://opencode.ai`
+
+To use another port or host, pass an absolute URL. It is remembered for that provider:
+
+```sh
+hearth --provider lmstudio --base-url http://localhost:4321
+```
+
+To configure every provider independently—useful when the servers are on different Tailscale machines—set all URLs in one command:
+
+```sh
+hearth \
+  --ollama-base-url http://ollama-host.tailnet-name.ts.net:11434 \
+  --lmstudio-base-url http://lmstudio-host.tailnet-name.ts.net:1234 \
+  --llamacpp-base-url http://llamacpp-host.tailnet-name.ts.net:8080
+```
+
+These flags only save their provider's URL. Add `--provider lmstudio`, for example, to choose which provider starts active. `--base-url` remains a shorthand for overriding the selected provider.
+
+Start the corresponding server before Hearth. The included `npm run ollama:start:unix` and `npm run ollama:start:windows` scripts only start Ollama. Start LM Studio from its Developer tab or with `lms server start`; start llama.cpp with, for example:
+
+```sh
+llama-server -m /path/to/model.gguf --port 8080
+```
+
+## API Keys
+
+OpenRouter and OpenCode Zen require an API key. Keys are stored in your operating system keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) and are never written to `preferences.json`.
+
+```sh
+hearth --openrouter-api-key sk-or-v1-...
+hearth --opencodezen-api-key sk-zen-...
+```
+
+Inside the app, set or inspect a key with `/key`:
+
+```text
+/key openrouter
+/key openrouter sk-or-v1-...
+/key openrouter clear
+```
+
+If a key is missing, Hearth prints a hint pointing at `/key <provider> <key>`. Note that OpenCode Zen's GPT, Claude, Gemini, Grok, and Qwen models use dedicated API protocols and are not yet supported; the chat-completions models (DeepSeek, MiniMax, GLM, Kimi, and the free tier) work today.
+
+## Usage
 
 ```sh
 hearth
-```
-
-Start Ollama first with `npm run ollama:start:windows` on Windows or `npm run ollama:start:unix` on Linux/macOS. Then `hearth` opens a new chat using the remembered model when possible. To return to existing work:
-
-```sh
 hearth --continue
 hearth --resume <id-or-title>
+hearth models --provider lmstudio
 ```
 
-The screen is split into:
+Inside the TUI:
 
-- A bordered output box for conversation history and streamed responses.
-- A bordered input box anchored near the bottom.
-- A status line showing the active model and approximate context usage.
-
-Or in development:
-
-```sh
-npm run dev
-```
-
-Useful non-interactive commands:
-
-```sh
-hearth models
-hearth list
-hearth --help
-```
-
-## Slash Commands
-
-- `/help`: Show available commands.
-- `/models`: Open an arrow-key picker for installed Ollama models.
-- `/new [model]`: Start another conversation. If no model is supplied, the remembered model is used first.
-- `/list`: Open an arrow-key picker for saved conversations.
-- `/load <id-or-title>`: Load a saved conversation by compact ID or title.
-- `/save`: Save the current conversation.
-- `/model <name>`: Switch the active model after validating it exists in Ollama.
-- `/system [prompt]`: Set the system prompt. Use `/system clear` to remove it.
+- `/provider [name]`: Pick a provider or switch to `ollama`, `lmstudio`, `llamacpp`, `openrouter`, or `opencodezen`.
+- `/models`: Pick a model exposed by the active provider.
+- `/new [model]`: Start another conversation.
+- `/list`: Pick a saved conversation.
+- `/load <id-or-title>`: Load a saved conversation.
+- `/model <name>`: Switch models on the active provider.
+- `/system [prompt]`: Set or clear the system prompt.
 - `/search <query>`: Search saved conversations.
 - `/regen`: Regenerate the last assistant response.
-- `/edit`: Edit the last user message and resubmit.
-- `/clear`: Clear the output view only. Saved history is not deleted.
-- `/exit`: Save and exit.
+- `/edit`: Edit and resubmit the last user message.
+- `/save`, `/clear`, `/help`, `/exit`: Save, clear the view, show help, or leave.
+
+Each conversation records its provider and model. Loading a saved conversation reconnects to that provider using the URL configured on the current machine. Conversations created before multi-provider support are treated as Ollama conversations.
 
 ## Storage
 
-Conversation files are saved as JSON in:
+Conversation files and `preferences.json` remain in the backward-compatible data directory:
 
-- Windows: `%USERPROFILE%\.ollama-cli-chat\conversations`
-- macOS/Linux: `~/.ollama-cli-chat/conversations`
+- Windows: `%USERPROFILE%\.ollama-cli-chat`
+- macOS/Linux: `~/.ollama-cli-chat`
 
-Set `OLLAMA_TERMINAL_CHAT_HOME` to use a different data directory.
-
-## Manual QA Script
-
-1. Start Ollama with the platform startup script.
-2. Run `hearth models` and confirm installed models are listed.
-3. Run `hearth` and confirm a new chat starts automatically.
-4. Run `/new <model>` and confirm another conversation starts.
-5. Confirm the bordered output box, input box, and status line render.
-6. Send a normal chat message and confirm the response streams inside the output box.
-7. Resize the terminal and confirm the boxes remain intact.
-8. Exit with `/exit`, restart `hearth`, and confirm a new chat uses the remembered model.
-9. Run `hearth --continue` and confirm the latest conversation loads.
-10. Run `hearth --resume <id-or-title>` and confirm the referenced conversation loads.
-11. Run `/list`, select a conversation with arrow keys, and press Enter.
-12. Confirm the previous messages are still present in the JSON file.
-13. Run `/models`, select another model with arrow keys, and confirm the status line updates.
-14. Run `/model <another-installed-model>` and confirm typed switching still works.
-15. Run `/system You are concise.` and confirm the saved JSON includes the prompt.
-16. Run `/search <word-from-earlier-message>` and confirm the conversation is returned.
-17. Run `/regen` and confirm the last assistant response is replaced.
-18. Run `/edit`, update the prefilled message, and confirm history reloads coherently.
+Set `OLLAMA_TERMINAL_CHAT_HOME` to use a different data directory. Despite its legacy name, it applies to every provider. API keys live in the system keychain, not in this directory.
 
 ## Development
 
@@ -126,3 +131,5 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+The automated suite mocks all server protocols and does not require Ollama, LM Studio, or llama.cpp to be installed. See [the user guide](./user-docs/README.md) for setup, usage, troubleshooting, and live QA instructions.

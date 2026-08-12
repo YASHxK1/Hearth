@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -87,6 +87,17 @@ describe("ConversationRepository", () => {
     await repository.ensureReady();
 
     await expect(repository.load("missing")).rejects.toThrow();
+  });
+
+  it("loads legacy conversations as Ollama conversations", async () => {
+    const dir = await tempDir();
+    const repository = new ConversationRepository(dir);
+    await repository.ensureReady();
+    const conversation = createConversation("llama3.2");
+    const { provider: _provider, ...legacy } = conversation;
+    await writeFile(join(dir, `${conversation.id}.json`), JSON.stringify(legacy), "utf8");
+
+    await expect(repository.load(conversation.id)).resolves.toMatchObject({ provider: "ollama" });
   });
 });
 

@@ -1,9 +1,8 @@
 import type {
-  ChatStreamEvent,
   OllamaChatChunk,
-  OllamaChatMessage,
   OllamaModel
 } from "./types.js";
+import type { ChatMessage, ChatStreamEvent, InferenceClient, ModelInfo } from "../providers/types.js";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_NOT_RUNNING_MESSAGE =
@@ -26,13 +25,16 @@ export async function ensureOllamaRunning(
   throw new Error(OLLAMA_NOT_RUNNING_MESSAGE);
 }
 
-export class OllamaClient {
-  constructor(private readonly baseUrl = DEFAULT_OLLAMA_BASE_URL) {}
+export class OllamaClient implements InferenceClient {
+  readonly provider = "ollama" as const;
+  constructor(public readonly baseUrl = DEFAULT_OLLAMA_BASE_URL, private readonly fetchImpl: typeof fetch = fetch) {}
 
-  async listModels(): Promise<OllamaModel[]> {
+  async listModels(): Promise<(OllamaModel & ModelInfo)[]> {
     const response = await this.fetchJson(`${this.baseUrl}/api/tags`);
     const models = (response as { models?: OllamaModel[] }).models;
-    return Array.isArray(models) ? models : [];
+    return Array.isArray(models)
+      ? models.map((model) => ({ ...model, id: model.name ?? model.model ?? "" })).filter((model) => model.id)
+      : [];
   }
 
   async hasModel(name: string): Promise<boolean> {
@@ -48,12 +50,16 @@ export class OllamaClient {
     }
   }
 
+  async ensureRunning(): Promise<void> {
+    await this.listModels();
+  }
+
   async *chat(
     model: string,
-    messages: OllamaChatMessage[]
+    messages: ChatMessage[]
   ): AsyncGenerator<ChatStreamEvent> {
-    await ensureOllamaRunning(this.baseUrl);
-    const response = await fetch(`${this.baseUrl}/api/chat`, {
+    await ensureOllamaRunning(this.baseUrl, { fetchImpl: this.fetchImpl });
+    const response = await this.fetchImpl(`${this.baseUrl}/api/chat`, {
       method: "POST",
       headers: {
         "content-type": "application/json"
@@ -82,8 +88,8 @@ export class OllamaClient {
   }
 
   private async fetchJson(url: string): Promise<unknown> {
-    await ensureOllamaRunning(this.baseUrl);
-    const response = await fetch(url).catch((error: unknown) => {
+    await ensureOllamaRunning(this.baseUrl, { fetchImpl: this.fetchImpl });
+    const response = await this.fetchImpl(url).catch((error: unknown) => {
       throw new Error(
         `Could not reach Ollama at ${this.baseUrl}. Start it first with scripts/start-ollama-hidden.ps1 on Windows or scripts/start-ollama-background.sh on Linux/macOS.`
       );

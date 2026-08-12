@@ -1,102 +1,15 @@
 # Storage And Privacy
 
-Ollama Terminal Chat is local-first.
+Hearth is local-first. It sends chat messages only to the configured model server URL. The defaults are localhost URLs for Ollama, LM Studio, and llama.cpp, or the OpenRouter/OpenCode Zen HTTPS endpoints; review any custom network URL before use.
 
-## What Leaves Your Machine
+Conversation JSON files remain in `%USERPROFILE%\.ollama-cli-chat\conversations` on Windows or `~/.ollama-cli-chat/conversations` on macOS/Linux. Preferences are stored beside them in `preferences.json`.
 
-The app sends chat requests only to your local Ollama API:
+The legacy `OLLAMA_TERMINAL_CHAT_HOME` environment variable changes this data directory for every provider.
 
-```text
-http://localhost:11434
-```
+Preferences store the last provider plus each provider's independent base URL and remembered model. Conversations store their provider, model, optional system prompt, and complete message history. They do not embed machine-specific URLs.
 
-It does not call external AI APIs.
+API keys for OpenRouter and OpenCode Zen are stored in the operating system keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using the `@napi-rs/keyring` library. They are never written to `preferences.json`.
 
-## Where Conversations Are Stored
+Older preferences containing only `lastModel` and conversations without `provider` are interpreted as Ollama data and upgraded when subsequently saved.
 
-Windows:
-
-```text
-%USERPROFILE%\.ollama-cli-chat\conversations
-```
-
-macOS/Linux:
-
-```text
-~/.ollama-cli-chat/conversations
-```
-
-Each conversation is one JSON file.
-
-## Where Preferences Are Stored
-
-The remembered model is stored in:
-
-Windows:
-
-```text
-%USERPROFILE%\.ollama-cli-chat\preferences.json
-```
-
-macOS/Linux:
-
-```text
-~/.ollama-cli-chat/preferences.json
-```
-
-The preferences file currently stores:
-
-```json
-{
-  "lastModel": "llama3.2"
-}
-```
-
-## Custom Storage Location
-
-Set:
-
-```powershell
-$env:OLLAMA_TERMINAL_CHAT_HOME = "E:\my-hearth-data"
-```
-
-Then run:
-
-```powershell
-hearth
-```
-
-On macOS/Linux:
-
-```sh
-export OLLAMA_TERMINAL_CHAT_HOME=/path/to/my-hearth-data
-hearth
-```
-
-## File Format
-
-Conversation files include:
-
-- Conversation ID.
-- Title.
-- Created timestamp.
-- Updated timestamp.
-- Active model.
-- Optional system prompt.
-- Full message history.
-
-## Backups
-
-Because conversations are plain JSON files, you can back up the whole conversations directory.
-
-To include your remembered model, also back up `preferences.json`.
-
-You can also copy a conversation JSON file to another machine and load it there if the file is placed in that machine's conversations directory.
-
-## Deleting Conversations
-
-There is no in-app delete command yet.
-
-To delete a conversation, remove its JSON file from the conversations directory.
-
-Use care when deleting files manually.
+Back up the data directory to preserve conversations and preferences. There is no in-app delete command; deletion currently requires manually removing a conversation JSON file.

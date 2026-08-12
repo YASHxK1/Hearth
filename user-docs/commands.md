@@ -10,13 +10,48 @@ All commands are typed into the input box.
 
 Shows the command reference inside the output box.
 
+## Provider
+
+```text
+/provider [ollama|lmstudio|llamacpp|openrouter|opencodezen]
+```
+
+With no name, opens the provider picker listing all five providers. A direct switch checks the target server before updating the conversation.
+
+Examples:
+
+```text
+/provider openrouter
+/provider lmstudio
+```
+
+Friendly names are accepted too: `zen`, `open router`, `opencode-zen`, and `open code` all resolve to their provider.
+
+## API Key
+
+```text
+/key <provider>
+/key <provider> <key>
+/key <provider> clear
+```
+
+Sets, checks, or removes a provider API key in the system keychain. Only OpenRouter and OpenCode Zen need keys.
+
+```text
+/key openrouter
+/key openrouter sk-or-v1-...
+/key openrouter clear
+```
+
+`/key <provider>` with no key prints whether one is configured.
+
 ## Models
 
 ```text
 /models
 ```
 
-Opens an arrow-key picker for installed Ollama models.
+Opens an arrow-key picker for models exposed by the active provider.
 
 Use Up/Down to move, Enter to select, and Esc to cancel.
 
@@ -36,7 +71,7 @@ Examples:
 /new
 ```
 
-If you omit the model, the app uses the remembered model first. If the remembered model is unavailable, it falls back to the first model reported by Ollama.
+If you omit the model, the app uses the active provider's remembered model first. If unavailable, it falls back to the first model reported by that provider.
 
 ## List Conversations
 
@@ -86,7 +121,7 @@ Example:
 /model qwen3:0.6b
 ```
 
-The model must already be installed in Ollama.
+The model must be exposed by the active provider.
 
 ## System Prompt
 

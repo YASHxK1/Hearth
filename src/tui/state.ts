@@ -1,7 +1,8 @@
 import type { ContextEstimate } from "../core/context-usage.js";
 import type { Message } from "../storage/schema.js";
 import type { ConversationSummary } from "../storage/schema.js";
-import type { OllamaModel } from "../ollama/types.js";
+import type { ModelInfo, ProviderId } from "../providers/types.js";
+import { PROVIDER_LABELS } from "../providers/config.js";
 import type { SearchMatch } from "../search/search.js";
 import { formatConversationReference } from "../core/conversation-reference.js";
 
@@ -12,10 +13,11 @@ export type DisplayMessage = {
   isStreaming?: boolean;
 };
 
-export type TuiMode = "chat" | "edit-user" | "select-model" | "select-conversation";
+export type TuiMode = "chat" | "edit-user" | "select-provider" | "select-model" | "select-conversation";
 
 export type TuiStatus = {
   activeModel?: string;
+  activeProvider?: ProviderId;
   contextEstimate?: ContextEstimate;
   mode: TuiMode;
   isStreaming: boolean;
@@ -49,7 +51,9 @@ export function formatHelp(): string {
   return [
     "Commands",
     "/help                 Show command help.",
-    "/models               Select an installed Ollama model.",
+    "/models               Select a model from the active provider.",
+    "/provider [name]      Select Ollama, LM Studio, llama.cpp, OpenRouter, or OpenCode Zen.",
+    "/key <provider> [key] Set or show an API key in the system keychain.",
     "/new [model]          Start a new conversation.",
     "/list                 Select a saved conversation.",
     "/load <id-or-title>   Load a saved conversation.",
@@ -65,22 +69,26 @@ export function formatHelp(): string {
   ].join("\n");
 }
 
-export function formatModels(models: OllamaModel[]): string {
+export function formatModels(models: ModelInfo[]): string {
   if (models.length === 0) {
-    return "No Ollama models installed.";
+    return "No models are available from the active provider.";
   }
 
-  return ["Installed models", ...models.map((model) => `- ${model.name ?? model.model}`)].join("\n");
+  return ["Available models", ...models.map((model) => `- ${model.name ?? model.id}`)].join("\n");
 }
 
-export function formatModelPickerRows(models: OllamaModel[]): string[] {
-  return models.map((model) => model.name ?? model.model ?? "unknown");
+export function formatModelPickerRows(models: ModelInfo[]): string[] {
+  return models.map((model) => model.name ?? model.id);
+}
+
+export function formatProviderPickerRows(providers: ProviderId[]): string[] {
+  return providers.map((provider) => PROVIDER_LABELS[provider]);
 }
 
 export function formatConversationPickerRows(summaries: ConversationSummary[]): string[] {
   return summaries.map(
     (summary) =>
-      `${formatConversationReference(summary.id)} ${summary.title}  (${summary.model}, ${summary.messageCount} messages, ${formatDate(
+      `${formatConversationReference(summary.id)} ${summary.title}  (${PROVIDER_LABELS[summary.provider]} / ${summary.model}, ${summary.messageCount} messages, ${formatDate(
         summary.updatedAt
       )})`
   );
@@ -105,7 +113,7 @@ export function formatSearchMatches(matches: SearchMatch[]): string {
   return matches
     .map((match) =>
       [
-        `${formatConversationReference(match.conversation.id)} ${match.conversation.title}  (${match.conversation.model}, ${formatDate(
+        `${formatConversationReference(match.conversation.id)} ${match.conversation.title}  (${PROVIDER_LABELS[match.conversation.provider]} / ${match.conversation.model}, ${formatDate(
           match.conversation.updatedAt
         )})`,
         ...match.snippets.map((snippet) => `  - ${snippet}`)

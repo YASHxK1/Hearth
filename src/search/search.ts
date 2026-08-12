@@ -1,7 +1,7 @@
 import type { Conversation } from "../storage/schema.js";
 
 export type SearchMatch = {
-  conversation: Pick<Conversation, "id" | "title" | "updatedAt" | "model">;
+  conversation: Pick<Conversation, "id" | "title" | "updatedAt" | "model" | "provider">;
   snippets: string[];
 };
 
@@ -41,7 +41,8 @@ export function searchConversations(
           id: conversation.id,
           title: conversation.title,
           updatedAt: conversation.updatedAt,
-          model: conversation.model
+          model: conversation.model,
+          provider: conversation.provider
         },
         snippets
       });

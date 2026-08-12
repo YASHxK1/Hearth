@@ -10,12 +10,14 @@ import {
   printSearchMatches,
   renderMarkdown
 } from "./output.js";
+import { parseProviderId } from "../providers/config.js";
+import type { ProviderId } from "../providers/types.js";
 
 export async function runRepl(app = new ChatApp()): Promise<void> {
   await app.init();
 
   const rl = createInterface({ input, output });
-  console.log(chalk.bold("Ollama Terminal Chat"));
+  console.log(chalk.bold("Hearth Local Model Chat"));
   console.log(chalk.dim("Use /new to begin, /help for commands, /exit to leave."));
 
   try {
@@ -63,11 +65,35 @@ async function handleCommand(
     case "models": {
       const models = await app.listModels();
       if (models.length === 0) {
-        console.log(chalk.dim("No Ollama models installed."));
+        console.log(chalk.dim("No models are available from the active provider."));
       } else {
         for (const model of models) {
-          console.log(model.name ?? model.model);
+          console.log(model.name ?? model.id);
         }
+      }
+      return false;
+    }
+    case "provider": {
+      requireArg(args, "/provider <ollama|lmstudio|llamacpp|openrouter|opencodezen>");
+      const provider = parseProviderId(args);
+      const model = await app.selectProvider(provider);
+      console.log(chalk.dim(`Selected ${provider} with ${model}.`));
+      return false;
+    }
+    case "key": {
+      const { provider, key, clear } = parseKeyArgs(args);
+      if (clear) {
+        app.clearApiKey(provider);
+        console.log(chalk.dim(`Cleared the ${provider} API key from the keychain.`));
+      } else if (key) {
+        app.setApiKey(provider, key);
+        console.log(chalk.dim(`Saved the ${provider} API key to the system keychain.`));
+      } else {
+        console.log(
+          app.hasApiKey(provider)
+            ? chalk.dim(`An API key is configured for ${provider}.`)
+            : chalk.dim(`No API key is configured for ${provider}. Use /key ${provider} <key> to add one.`)
+        );
       }
       return false;
     }
@@ -177,4 +203,17 @@ function requireArg(value: string, usage: string): void {
   if (!value.trim()) {
     throw new Error(`Usage: ${usage}`);
   }
+}
+
+function parseKeyArgs(args: string): { provider: ProviderId; key?: string; clear: boolean } {
+  const [first, ...rest] = args.trim().split(/\s+/);
+  if (!first) {
+    throw new Error("Usage: /key <provider> [key] or /key <provider> clear");
+  }
+  const provider = parseProviderId(first);
+  const value = rest.join(" ");
+  if (value.toLowerCase() === "clear") {
+    return { provider, clear: true };
+  }
+  return { provider, key: value || undefined, clear: false };
 }

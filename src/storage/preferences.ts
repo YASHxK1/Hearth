@@ -1,8 +1,18 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { getPreferencesPath } from "./paths.js";
+import { DEFAULT_BASE_URLS, DEFAULT_PROVIDER, PROVIDER_IDS } from "../providers/config.js";
+import type { ProviderId } from "../providers/types.js";
+
+export type ProviderPreference = {
+  baseUrl?: string;
+  lastModel?: string;
+};
 
 export type UserPreferences = {
+  lastProvider?: ProviderId;
+  providers?: Partial<Record<ProviderId, ProviderPreference>>;
+  /** Legacy v1 preference, read as Ollama's last model. */
   lastModel?: string;
 };
 
@@ -13,9 +23,7 @@ export class PreferencesRepository {
     try {
       const raw = await readFile(this.preferencesPath, "utf8");
       const parsed = JSON.parse(raw) as Partial<UserPreferences>;
-      return {
-        lastModel: normalizeString(parsed.lastModel)
-      };
+      return normalizePreferences(parsed);
     } catch {
       return {};
     }
@@ -31,8 +39,42 @@ export class PreferencesRepository {
 }
 
 function cleanPreferences(preferences: UserPreferences): UserPreferences {
+  const normalized = normalizePreferences(preferences);
   return {
-    lastModel: normalizeString(preferences.lastModel)
+    lastProvider: normalized.lastProvider,
+    providers: normalized.providers
+  };
+}
+
+function normalizePreferences(preferences: Partial<UserPreferences>): UserPreferences {
+  const providers: Partial<Record<ProviderId, ProviderPreference>> = {};
+  for (const provider of PROVIDER_IDS) {
+    const input = preferences.providers?.[provider];
+    const baseUrl = normalizeString(input?.baseUrl);
+    const lastModel = normalizeString(input?.lastModel);
+    if (baseUrl || lastModel) providers[provider] = { baseUrl, lastModel };
+  }
+  const legacyModel = normalizeString(preferences.lastModel);
+  if (legacyModel && !providers.ollama?.lastModel) {
+    providers.ollama = { ...providers.ollama, lastModel: legacyModel };
+  }
+  const lastProvider = isProviderId(preferences.lastProvider)
+    ? preferences.lastProvider
+    : DEFAULT_PROVIDER;
+  return { lastProvider, providers };
+}
+
+function isProviderId(value: unknown): value is ProviderId {
+  return typeof value === "string" && (PROVIDER_IDS as string[]).includes(value);
+}
+
+export function providerPreference(
+  preferences: UserPreferences,
+  provider: ProviderId
+): Required<Pick<ProviderPreference, "baseUrl">> & Pick<ProviderPreference, "lastModel"> {
+  return {
+    baseUrl: preferences.providers?.[provider]?.baseUrl ?? DEFAULT_BASE_URLS[provider],
+    lastModel: preferences.providers?.[provider]?.lastModel
   };
 }
 

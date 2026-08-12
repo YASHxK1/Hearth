@@ -5,12 +5,15 @@ import type { ConversationSummary } from "../storage/schema.js";
 import type { ContextEstimate } from "../core/context-usage.js";
 import type { SearchMatch } from "../search/search.js";
 import { formatConversationReference } from "../core/conversation-reference.js";
+import { PROVIDER_LABELS } from "../providers/config.js";
 
 export function printHelp(): void {
   console.log(`
 ${chalk.bold("Commands")}
   /help                 Show this help.
-  /models               Select an installed Ollama model in the TUI.
+  /provider [name]      Select Ollama, LM Studio, llama.cpp, OpenRouter, or OpenCode Zen.
+  /key <provider> [key] Set or show an API key in the system keychain. Use clear to remove it.
+  /models               Select a model from the active provider in the TUI.
   /new [model]          Start a new conversation.
   /list                 Select a saved conversation in the TUI.
   /load <id-or-title>   Load a saved conversation.
@@ -34,7 +37,7 @@ export function printConversationList(summaries: ConversationSummary[]): void {
   for (const summary of summaries) {
     console.log(
       `${chalk.cyan(formatConversationReference(summary.id))} ${chalk.bold(summary.title)}  ${chalk.dim(
-        `${summary.model} | ${summary.messageCount} messages | ${formatDate(summary.updatedAt)}`
+        `${PROVIDER_LABELS[summary.provider]} / ${summary.model} | ${summary.messageCount} messages | ${formatDate(summary.updatedAt)}`
       )}`
     );
   }
@@ -49,7 +52,7 @@ export function printSearchMatches(matches: SearchMatch[]): void {
   for (const match of matches) {
     console.log(
       `${chalk.cyan(formatConversationReference(match.conversation.id))} ${chalk.bold(match.conversation.title)}  ${chalk.dim(
-        `${match.conversation.model} | ${formatDate(match.conversation.updatedAt)}`
+        `${PROVIDER_LABELS[match.conversation.provider]} / ${match.conversation.model} | ${formatDate(match.conversation.updatedAt)}`
       )}`
     );
     for (const snippet of match.snippets) {

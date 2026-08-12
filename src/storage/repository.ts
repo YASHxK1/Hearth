@@ -86,6 +86,7 @@ export class ConversationRepository {
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
         model: conversation.model,
+        provider: conversation.provider,
         messageCount: conversation.messages.length
       }))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -149,7 +150,10 @@ function parseConversation(raw: string, path: string): Conversation {
     throw new Error(`Conversation file ${path} does not match the expected schema.`);
   }
 
-  return parsed;
+  return {
+    ...parsed,
+    provider: parsed.provider ?? "ollama"
+  };
 }
 
 function normalizeTitle(value: string): string {

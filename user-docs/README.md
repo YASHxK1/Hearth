@@ -1,21 +1,10 @@
-# Ollama Terminal Chat User Guide
+# Hearth Local Model Chat User Guide
 
-This folder contains the user documentation for Ollama Terminal Chat, a local terminal chat app for Ollama models.
+Hearth provides persistent terminal chat for models served locally by Ollama, LM Studio, or llama.cpp, plus the remote OpenRouter and OpenCode Zen APIs.
 
-The app gives you a persistent chat experience in the terminal:
-
-- A bordered output box for conversation history and streamed responses.
-- A bordered input box where you type messages and slash commands.
-- A status line showing the active model and approximate context usage.
-- Automatic local conversation saving.
-- Remembered last-used model across app restarts.
-- Conversation list, compact-ID/title loading, search, model switching, system prompts, regenerate, and edit-last-message support.
-
-Everything stays on your machine. The app talks to your local Ollama server and stores conversations as local JSON files.
+It includes a bordered streaming chat UI, automatic local conversation saving, provider and model selection, remembered server settings, conversation search/loading, system prompts, regeneration, and edit-last-message support.
 
 ## Documentation Map
-
-Read these in order if you are setting the app up for the first time:
 
 1. [Install And Run](./install-and-run.md)
 2. [First Chat](./first-chat.md)
@@ -31,25 +20,28 @@ Reference pages:
 - [Troubleshooting](./troubleshooting.md)
 - [First Run Checklist](./first-run-checklist.md)
 
-Legacy/reference copy:
-
-- [Previous Single-Page User Doc](./previous-user-doc.md)
+The [previous single-page guide](./previous-user-doc.md) documents the earlier Ollama-only release.
 
 ## Fast Path
 
-From the project folder:
+Start one supported model server, then run:
 
-```powershell
+```sh
 npm install
 npm run build
-npm run dev
+npm run dev -- --provider lmstudio
+```
+
+For remote providers, set an API key first (stored in your OS keychain):
+
+```sh
+npm run dev -- --provider openrouter --openrouter-api-key sk-or-v1-...
 ```
 
 Inside the app:
 
 ```text
+/provider
 /models
 /new
 ```
-
-Then type a normal message.

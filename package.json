@@ -1,7 +1,7 @@
 {
   "name": "ollama-terminal-chat",
   "version": "0.1.0",
-  "description": "A persistent terminal chat interface for local Ollama models.",
+  "description": "A persistent terminal chat interface for Ollama, LM Studio, and llama.cpp.",
   "type": "module",
   "bin": {
     "hearth": "./dist/index.js",
@@ -20,6 +20,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@napi-rs/keyring": "^1.3.0",
     "chalk": "^5.4.1",
     "commander": "^12.1.0",
     "highlight.js": "^11.10.0",

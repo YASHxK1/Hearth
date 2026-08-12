@@ -23,7 +23,7 @@ The output box shows:
 - Search results.
 - Errors.
 
-Assistant responses stream into this box as Ollama generates them.
+Assistant responses stream into this box as the active provider generates them.
 
 ## Input Box
 
@@ -54,11 +54,13 @@ Chat | Model: llama3.2 | Approx context: 1,240 tokens (4,830 chars) | /help
 
 ## Pickers
 
-`/models` and `/list` open picker panels.
+`/provider`, `/models`, and `/list` open picker panels.
 
 - Up/Down moves through choices.
 - Enter selects the highlighted item.
 - Esc cancels and returns to chat mode.
+
+`/provider` lists all five providers: Ollama, LM Studio, llama.cpp, OpenRouter, and OpenCode Zen.
 
 ## Resize Behavior
 

@@ -1,7 +1,8 @@
 import { createId } from "./ids.js";
 import type { Conversation, Message, MessageRole } from "../storage/schema.js";
+import type { ChatMessage, ProviderId } from "../providers/types.js";
 
-export function createConversation(model: string, systemPrompt?: string): Conversation {
+export function createConversation(model: string, systemPrompt?: string, provider: ProviderId = "ollama"): Conversation {
   const now = new Date().toISOString();
   return {
     id: createId("conv"),
@@ -9,6 +10,7 @@ export function createConversation(model: string, systemPrompt?: string): Conver
     createdAt: now,
     updatedAt: now,
     model,
+    provider,
     systemPrompt: normalizeSystemPrompt(systemPrompt),
     messages: []
   };
@@ -91,10 +93,7 @@ export function replaceLastUserMessage(conversation: Conversation, content: stri
   throw new Error("No user message is available to edit.");
 }
 
-export function toOllamaMessages(conversation: Conversation): Array<{
-  role: "system" | "user" | "assistant";
-  content: string;
-}> {
+export function toChatMessages(conversation: Conversation): ChatMessage[] {
   const messages = conversation.messages.map(({ role, content }) => ({ role, content }));
 
   if (conversation.systemPrompt) {
@@ -103,6 +102,9 @@ export function toOllamaMessages(conversation: Conversation): Array<{
 
   return messages;
 }
+
+/** @deprecated Use toChatMessages. */
+export const toOllamaMessages = toChatMessages;
 
 function titleFromContent(content: string): string {
   const compact = content.replace(/\s+/g, " ").trim();

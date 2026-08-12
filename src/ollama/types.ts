@@ -5,10 +5,7 @@ export type OllamaModel = {
   size?: number;
 };
 
-export type OllamaChatMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
+export type { ChatMessage as OllamaChatMessage } from "../providers/types.js";
 
 export type OllamaChatChunk = {
   model?: string;
@@ -27,14 +24,4 @@ export type OllamaChatChunk = {
   error?: string;
 };
 
-export type ChatDelta = {
-  type: "delta";
-  content: string;
-};
-
-export type ChatDone = {
-  type: "done";
-  raw: OllamaChatChunk;
-};
-
-export type ChatStreamEvent = ChatDelta | ChatDone;
+export type { ChatDelta, ChatDone, ChatStreamEvent } from "../providers/types.js";

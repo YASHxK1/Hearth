@@ -24,7 +24,10 @@ describe("PreferencesRepository", () => {
 
     await repository.save({ lastModel: "llama3.2" });
 
-    await expect(repository.load()).resolves.toEqual({ lastModel: "llama3.2" });
+    await expect(repository.load()).resolves.toEqual({
+      lastProvider: "ollama",
+      providers: { ollama: { baseUrl: undefined, lastModel: "llama3.2" } }
+    });
     await expect(readFile(path, "utf8")).resolves.toContain("llama3.2");
   });
 
@@ -35,6 +38,40 @@ describe("PreferencesRepository", () => {
     await writeFile(path, "{ nope", "utf8");
 
     await expect(new PreferencesRepository(path).load()).resolves.toEqual({});
+  });
+
+  it("saves provider-specific URLs and models", async () => {
+    const path = join(await tempDir(), "preferences.json");
+    const repository = new PreferencesRepository(path);
+    await repository.save({
+      lastProvider: "lmstudio",
+      providers: { lmstudio: { baseUrl: "http://localhost:4321", lastModel: "qwen" } }
+    });
+
+    await expect(repository.load()).resolves.toEqual({
+      lastProvider: "lmstudio",
+      providers: { lmstudio: { baseUrl: "http://localhost:4321", lastModel: "qwen" } }
+    });
+  });
+
+  it("remembers base URLs for remote providers", async () => {
+    const path = join(await tempDir(), "preferences.json");
+    const repository = new PreferencesRepository(path);
+    await repository.save({
+      lastProvider: "openrouter",
+      providers: {
+        openrouter: { baseUrl: "https://openrouter.ai", lastModel: "openai/gpt-4o" },
+        opencodezen: { baseUrl: "https://opencode.ai", lastModel: "deepseek-v4-flash" }
+      }
+    });
+
+    await expect(repository.load()).resolves.toEqual({
+      lastProvider: "openrouter",
+      providers: {
+        openrouter: { baseUrl: "https://openrouter.ai", lastModel: "openai/gpt-4o" },
+        opencodezen: { baseUrl: "https://opencode.ai", lastModel: "deepseek-v4-flash" }
+      }
+    });
   });
 });
 

@@ -17,8 +17,8 @@ describe("tui formatters", () => {
   });
 
   it("formats model lists", () => {
-    expect(formatModels([{ name: "llama3.2" }])).toContain("llama3.2");
-    expect(formatModelPickerRows([{ name: "llama3.2" }])).toEqual(["llama3.2"]);
+    expect(formatModels([{ id: "llama3.2", name: "llama3.2" }])).toContain("llama3.2");
+    expect(formatModelPickerRows([{ id: "llama3.2", name: "llama3.2" }])).toEqual(["llama3.2"]);
   });
 
   it("formats empty conversation lists", () => {
@@ -34,6 +34,7 @@ describe("tui formatters", () => {
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z",
           model: "llama3.2",
+          provider: "ollama",
           messageCount: 2
         }
       ])
@@ -49,6 +50,7 @@ describe("tui formatters", () => {
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z",
           model: "llama3.2",
+          provider: "ollama",
           messageCount: 2
         }
       ])[0]

@@ -14,7 +14,7 @@ You can omit the model:
 /new
 ```
 
-The app picks the first model reported by Ollama.
+The app uses the remembered model for the active provider, or the first model that provider reports.
 
 ## Automatic Saving
 

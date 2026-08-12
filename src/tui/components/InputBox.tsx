@@ -15,7 +15,7 @@ export function InputBox({ value, mode, isDisabled, onChange, onSubmit }: InputB
   const placeholder =
     mode === "edit-user"
       ? "Edit last message..."
-      : mode === "select-model" || mode === "select-conversation"
+      : mode === "select-provider" || mode === "select-model" || mode === "select-conversation"
         ? "Use picker above..."
         : "Ask anything...";
 

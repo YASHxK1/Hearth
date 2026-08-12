@@ -13,13 +13,14 @@ export type Conversation = {
   createdAt: string;
   updatedAt: string;
   model: string;
+  provider: ProviderId;
   systemPrompt?: string;
   messages: Message[];
 };
 
 export type ConversationSummary = Pick<
   Conversation,
-  "id" | "title" | "createdAt" | "updatedAt" | "model"
+  "id" | "title" | "createdAt" | "updatedAt" | "model" | "provider"
 > & {
   messageCount: number;
 };
@@ -36,6 +37,12 @@ export function isConversation(value: unknown): value is Conversation {
     typeof candidate.createdAt === "string" &&
     typeof candidate.updatedAt === "string" &&
     typeof candidate.model === "string" &&
+    (candidate.provider === undefined ||
+      candidate.provider === "ollama" ||
+      candidate.provider === "lmstudio" ||
+      candidate.provider === "llamacpp" ||
+      candidate.provider === "openrouter" ||
+      candidate.provider === "opencodezen") &&
     Array.isArray(candidate.messages) &&
     candidate.messages.every(isMessage)
   );
@@ -56,3 +63,4 @@ function isMessage(value: unknown): value is Message {
     typeof candidate.createdAt === "string"
   );
 }
+import type { ProviderId } from "../providers/types.js";

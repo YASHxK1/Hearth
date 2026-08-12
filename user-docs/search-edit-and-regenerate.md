@@ -38,7 +38,7 @@ Use:
 /regen
 ```
 
-This removes the most recent assistant message and asks Ollama to answer the previous user message again.
+This removes the most recent assistant message and asks the conversation's saved provider to answer the previous user message again.
 
 Use this when:
 
@@ -62,7 +62,7 @@ The app:
 
 1. Replaces your last user message.
 2. Removes any assistant response that followed it.
-3. Sends the edited message to Ollama.
+3. Sends the edited message to the conversation's provider.
 4. Saves the updated conversation.
 
 Cancel edit mode with Esc.

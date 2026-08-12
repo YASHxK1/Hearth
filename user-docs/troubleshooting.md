@@ -1,127 +1,38 @@
 # Troubleshooting
 
-## The App Cannot Reach Ollama
+## Hearth Cannot Reach The Server
 
-You may see:
+Confirm that the status/error names the intended provider and URL. Start that server, then retry:
 
-```text
-Ollama is not running.
-```
+- Ollama: use the included platform startup script.
+- LM Studio: enable the Developer server or run `lms server start`.
+- llama.cpp: run `llama-server -m <model.gguf> --port 8080`.
+- OpenRouter/OpenCode Zen: confirm the provider's API key is set with `/key <provider>`; on 401/403 errors, regenerate the key and run `/key <provider> <new-key>`.
 
-Fix on Windows:
-
-```powershell
-.\scripts\start-ollama-hidden.ps1
-```
-
-Fix on Linux/macOS:
+If the server uses a different address, save it with:
 
 ```sh
-./scripts/start-ollama-background.sh
+hearth --provider lmstudio --base-url http://localhost:4321
 ```
 
-Then run the app again.
+For providers hosted on separate machines, use `--ollama-base-url`, `--lmstudio-base-url`, and `--llamacpp-base-url`. For remote providers, `--openrouter-base-url` and `--opencodezen-base-url` override their defaults. Tailscale DNS names and IP addresses are accepted when supplied as an absolute `http://` or `https://` origin.
 
-## No Models Are Installed
+## No Models Are Available
 
-You may see:
+Load or install a chat model in the active provider, then use `/models`. For Ollama, run `ollama pull <model>`. For LM Studio, download/load it in the application. For llama.cpp, start the server with a model or configure router mode.
 
-```text
-No Ollama models are installed.
-```
+## A Saved Conversation Will Not Load
 
-Install one:
+Saved conversations reconnect to their recorded provider. Start that provider and ensure its configured URL is correct. Older conversation files default to Ollama.
 
-```powershell
-ollama pull llama3.2
-```
+## A Model Is Rejected
 
-Then start a conversation:
+The model must appear in the active server’s model endpoint. Run `/models` and choose an available chat model. A model exposed by one provider does not automatically exist in another.
 
-```text
-/new llama3.2
-```
+## The TUI Looks Broken
 
-## Model Is Not Installed
+Use a modern terminal and a practical minimum size of roughly 80 columns by 24 rows. Resize and restart Hearth if necessary.
 
-You may see:
+## Automated Versus Live Testing
 
-```text
-Model "mistral" is not installed in Ollama.
-```
-
-Install that model:
-
-```powershell
-ollama pull mistral
-```
-
-Or choose a model from:
-
-```text
-/models
-```
-
-## `hearth` Is Not Recognized
-
-From the project folder:
-
-```powershell
-npm run build
-npm install -g .
-```
-
-Then try:
-
-```powershell
-hearth
-```
-
-## TUI Looks Broken
-
-Try:
-
-- Make the terminal window taller and wider.
-- Use Windows Terminal, PowerShell 7, or another modern terminal.
-- Re-run the app after resizing.
-
-Minimum practical terminal size is roughly 80 columns by 24 rows.
-
-## Output Box Cleared Unexpectedly
-
-If you ran:
-
-```text
-/clear
-```
-
-Only the current output view was cleared. Saved conversation files are still on disk.
-
-Use:
-
-```text
-/list
-```
-
-Then:
-
-```text
-/load conv_6794fa16-
-```
-
-## Tests Pass But Live Chat Fails
-
-The automated tests do not require a live Ollama server.
-
-For live chat, verify:
-
-```powershell
-.\scripts\start-ollama-hidden.ps1
-ollama list
-```
-
-Then:
-
-```powershell
-hearth
-```
+The automated tests mock all three APIs. A passing test suite does not prove that an external server is running or that a particular model has a compatible chat template.

@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ChatApp } from "../src/core/app.js";
 import { appendMessage, createConversation } from "../src/core/conversation.js";
 import { OllamaClient } from "../src/ollama/client.js";
-import type { ChatStreamEvent, OllamaChatMessage, OllamaModel } from "../src/ollama/types.js";
+import type {
+  ChatStreamEvent,
+  ChatMessage,
+  InferenceClient,
+  ModelInfo,
+  ProviderId
+} from "../src/providers/types.js";
 import { PreferencesRepository } from "../src/storage/preferences.js";
 import { ConversationRepository } from "../src/storage/repository.js";
 
@@ -107,6 +113,61 @@ describe("ChatApp startup helpers", () => {
   });
 });
 
+describe("ChatApp providers", () => {
+  it("remembers independent base URLs without changing the active provider", async () => {
+    const dir = await tempDir();
+    const preferences = new PreferencesRepository(join(dir, "preferences.json"));
+    const app = new ChatApp(
+      undefined,
+      new ConversationRepository(join(dir, "conversations")),
+      preferences
+    );
+    await app.init();
+
+    await app.configureProvider("ollama", "http://ollama.tailnet:11434", false);
+    await app.configureProvider("lmstudio", "http://lmstudio.tailnet:1234", false);
+    await app.configureProvider("llamacpp", "http://llamacpp.tailnet:8080", false);
+
+    expect(app.activeProvider).toBe("ollama");
+    await expect(preferences.load()).resolves.toMatchObject({
+      lastProvider: "ollama",
+      providers: {
+        ollama: { baseUrl: "http://ollama.tailnet:11434" },
+        lmstudio: { baseUrl: "http://lmstudio.tailnet:1234" },
+        llamacpp: { baseUrl: "http://llamacpp.tailnet:8080" }
+      }
+    });
+  });
+
+  it("switches an active conversation to a reachable provider and remembers its model", async () => {
+    const dir = await tempDir();
+    const repository = new ConversationRepository(join(dir, "conversations"));
+    const preferences = new PreferencesRepository(join(dir, "preferences.json"));
+    const models: Record<ProviderId, string[]> = {
+      ollama: ["llama3.2"],
+      lmstudio: ["local-qwen"],
+      llamacpp: ["model.gguf"],
+      openrouter: ["openai/gpt-4o"],
+      opencodezen: ["deepseek-v4-flash"]
+    };
+    const app = new ChatApp(
+      undefined,
+      repository,
+      preferences,
+      (provider, baseUrl) => new FakeProviderClient(provider, baseUrl, models[provider])
+    );
+    await app.init();
+    await app.startNew();
+
+    await expect(app.selectProvider("lmstudio")).resolves.toBe("local-qwen");
+    expect(app.currentConversation).toMatchObject({ provider: "lmstudio", model: "local-qwen" });
+    await expect(preferences.load()).resolves.toMatchObject({
+      lastProvider: "lmstudio",
+      providers: { lmstudio: { lastModel: "local-qwen" } }
+    });
+  });
+});
+
 async function createTestApp(models: string[]) {
   const dir = await tempDir();
   const repository = new ConversationRepository(join(dir, "conversations"));
@@ -127,8 +188,8 @@ class FakeOllamaClient extends OllamaClient {
     super("http://fake-ollama");
   }
 
-  override async listModels(): Promise<OllamaModel[]> {
-    return this.modelNames.map((name) => ({ name }));
+  override async listModels(): Promise<(ModelInfo & { name: string })[]> {
+    return this.modelNames.map((name) => ({ id: name, name }));
   }
 
   override async hasModel(name: string): Promise<boolean> {
@@ -143,9 +204,35 @@ class FakeOllamaClient extends OllamaClient {
 
   override async *chat(
     _model: string,
-    _messages: OllamaChatMessage[]
+    _messages: ChatMessage[]
   ): AsyncGenerator<ChatStreamEvent> {
     yield { type: "delta", content: "ok" };
     yield { type: "done", raw: { done: true } };
+  }
+}
+
+class FakeProviderClient implements InferenceClient {
+  constructor(
+    readonly provider: ProviderId,
+    readonly baseUrl: string,
+    private readonly modelNames: string[]
+  ) {}
+
+  async listModels(): Promise<ModelInfo[]> {
+    return this.modelNames.map((id) => ({ id, name: id }));
+  }
+
+  async hasModel(name: string): Promise<boolean> {
+    return this.modelNames.includes(name);
+  }
+
+  async assertModelAvailable(name: string): Promise<void> {
+    if (!(await this.hasModel(name))) throw new Error(`Missing ${name}`);
+  }
+
+  async ensureRunning(): Promise<void> {}
+
+  async *chat(): AsyncGenerator<ChatStreamEvent> {
+    yield { type: "done" };
   }
 }

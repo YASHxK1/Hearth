@@ -17,6 +17,7 @@ import {
   formatHelp,
   formatModelPickerRows,
   formatModels,
+  formatProviderPickerRows,
   formatSearchMatches,
   fromMessages,
   notice,
@@ -25,11 +26,16 @@ import {
   type TuiStatus
 } from "./state.js";
 import type { ConversationSummary } from "../storage/schema.js";
-import type { OllamaModel } from "../ollama/types.js";
+import type { ModelInfo, ProviderId } from "../providers/types.js";
+import { parseProviderId, PROVIDER_IDS } from "../providers/config.js";
 
 type InkChatAppProps = {
   app?: ChatApp;
   startupMode?: TuiStartupMode;
+  startupProvider?: ProviderId;
+  startupBaseUrl?: string;
+  startupProviderBaseUrls?: Partial<Record<ProviderId, string>>;
+  startupProviderApiKeys?: Partial<Record<ProviderId, string>>;
 };
 
 export type TuiStartupMode =
@@ -40,7 +46,14 @@ export type TuiStartupMode =
 
 const DEFAULT_STARTUP_MODE: TuiStartupMode = { type: "none" };
 
-export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MODE }: InkChatAppProps) {
+export function InkChatApp({
+  app: providedApp,
+  startupMode = DEFAULT_STARTUP_MODE,
+  startupProvider,
+  startupBaseUrl,
+  startupProviderBaseUrls,
+  startupProviderApiKeys
+}: InkChatAppProps) {
   const app = useMemo(() => providedApp ?? new ChatApp(), [providedApp]);
   const { exit } = useApp();
   const terminal = useTerminalSize();
@@ -51,7 +64,7 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
   const [activeModel, setActiveModel] = useState<string | undefined>();
   const [contextEstimate, setContextEstimate] = useState<TuiStatus["contextEstimate"]>();
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [modelOptions, setModelOptions] = useState<OllamaModel[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelInfo[]>([]);
   const [conversationOptions, setConversationOptions] = useState<ConversationSummary[]>([]);
 
   const appendMessage = useCallback((message: DisplayMessage) => {
@@ -98,6 +111,18 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
     app
       .init()
       .then(async () => {
+        for (const provider of PROVIDER_IDS) {
+          const url = startupProviderBaseUrls?.[provider];
+          if (url) await app.configureProvider(provider, url, false);
+        }
+        for (const [provider, key] of Object.entries(startupProviderApiKeys ?? {}) as Array<
+          [ProviderId, string]
+        >) {
+          if (key) app.setApiKey(provider, key);
+        }
+        if (startupProvider || startupBaseUrl) {
+          await app.configureProvider(startupProvider ?? app.activeProvider, startupBaseUrl);
+        }
         const startupNotice = await applyStartupMode(app, startupMode);
         syncFromConversation([notice(startupNotice)]);
       })
@@ -105,7 +130,7 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
         appendMessage(errorMessage((error as Error).message));
         syncStatusOnly(app, setActiveModel, setContextEstimate);
       });
-  }, [app, appendMessage, startupMode, syncFromConversation]);
+  }, [app, appendMessage, startupMode, startupProvider, startupBaseUrl, startupProviderBaseUrls, startupProviderApiKeys, syncFromConversation]);
 
   const closePicker = useCallback(() => {
     setMode("chat");
@@ -115,8 +140,8 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
   }, []);
 
   const selectModel = useCallback(
-    async (model: OllamaModel) => {
-      const modelName = model.name ?? model.model;
+    async (model: ModelInfo) => {
+      const modelName = model.id;
       if (!modelName) {
         appendMessage(errorMessage("Selected model is invalid."));
         return;
@@ -137,6 +162,15 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
     [app, appendMessage, closePicker, syncFromConversation]
   );
 
+  const selectProvider = useCallback(
+    async (provider: ProviderId) => {
+      const model = await app.selectProvider(provider);
+      closePicker();
+      syncFromConversation([notice(`Selected provider: ${provider} (${model}).`)]);
+    },
+    [app, closePicker, syncFromConversation]
+  );
+
   const selectConversation = useCallback(
     async (conversation: ConversationSummary) => {
       const loaded = await app.loadConversation(conversation.id);
@@ -147,8 +181,10 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
   );
 
   useInput((_, key) => {
-    if (mode === "select-model" || mode === "select-conversation") {
-      const optionsLength = mode === "select-model" ? modelOptions.length : conversationOptions.length;
+    if (mode === "select-provider" || mode === "select-model" || mode === "select-conversation") {
+      const optionsLength = mode === "select-provider"
+        ? PROVIDER_IDS.length
+        : mode === "select-model" ? modelOptions.length : conversationOptions.length;
 
       if (key.escape) {
         closePicker();
@@ -171,7 +207,15 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
       }
 
       if (key.return) {
-        if (mode === "select-model") {
+        if (mode === "select-provider") {
+          const provider = PROVIDER_IDS[selectedIndex];
+          if (provider) {
+            void selectProvider(provider).catch((error: unknown) => {
+              appendMessage(errorMessage((error as Error).message));
+              closePicker();
+            });
+          }
+        } else if (mode === "select-model") {
           const model = modelOptions[selectedIndex];
           if (model) {
             void selectModel(model).catch((error: unknown) => {
@@ -204,7 +248,7 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
   const submit = useCallback(
     async (value: string) => {
       const trimmed = value.trim();
-      if (!trimmed || isStreaming || mode === "select-model" || mode === "select-conversation") {
+      if (!trimmed || isStreaming || mode === "select-provider" || mode === "select-model" || mode === "select-conversation") {
         return;
       }
 
@@ -264,6 +308,7 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
 
   const status: TuiStatus = {
     activeModel,
+    activeProvider: app.activeProvider,
     contextEstimate,
     mode,
     isStreaming
@@ -286,7 +331,7 @@ export function InkChatApp({ app: providedApp, startupMode = DEFAULT_STARTUP_MOD
       <InputBox
         value={input}
         mode={mode}
-        isDisabled={isStreaming || mode === "select-model" || mode === "select-conversation"}
+        isDisabled={isStreaming || mode === "select-provider" || mode === "select-model" || mode === "select-conversation"}
         onChange={setInput}
         onSubmit={submit}
       />
@@ -302,12 +347,10 @@ async function applyStartupMode(app: ChatApp, startupMode: TuiStartupMode): Prom
       return `Started ${conversation.id} with ${conversation.model}.`;
     }
     case "continue": {
-      await app.ensureOllamaRunning();
       const conversation = await app.continueLatestConversation();
       return `Loaded latest: ${conversation.title}`;
     }
     case "resume": {
-      await app.ensureOllamaRunning();
       const conversation = await app.resumeConversation(startupMode.reference);
       return `Loaded: ${conversation.title}`;
     }
@@ -327,7 +370,7 @@ type CommandContext = {
   setMessages: React.Dispatch<React.SetStateAction<DisplayMessage[]>>;
   setIsStreaming: (value: boolean) => void;
   setSelectedIndex: (value: number) => void;
-  setModelOptions: (value: OllamaModel[]) => void;
+  setModelOptions: (value: ModelInfo[]) => void;
   setConversationOptions: (value: ConversationSummary[]) => void;
   appendMessage: (message: DisplayMessage) => void;
   stream: ReturnType<typeof useBatchedStream>;
@@ -344,6 +387,35 @@ async function handleCommand(context: CommandContext): Promise<boolean> {
     case "models":
       await openModelPicker(context);
       return false;
+    case "provider":
+      if (args) {
+        const provider = parseProviderId(args);
+        const model = await app.selectProvider(provider);
+        syncFromConversation([notice(`Selected provider: ${provider} (${model}).`)]);
+      } else {
+        context.setModelOptions([]);
+        context.setConversationOptions([]);
+        context.setSelectedIndex(0);
+        context.setMode("select-provider");
+      }
+      return false;
+    case "key": {
+      const { provider, key, clear } = parseKeyArgs(args);
+      if (clear) {
+        app.clearApiKey(provider);
+        appendMessage(notice(`Cleared the ${provider} API key from the keychain.`));
+      } else if (key) {
+        app.setApiKey(provider, key);
+        appendMessage(notice(`Saved the ${provider} API key to the system keychain.`));
+      } else {
+        appendMessage(
+          app.hasApiKey(provider)
+            ? notice(`An API key is configured for ${provider}.`)
+            : notice(`No API key is configured for ${provider}. Use /key ${provider} <key> to add one.`)
+        );
+      }
+      return false;
+    }
     case "new": {
       const conversation = await app.startNew(args || undefined);
       syncFromConversation([notice(`Started ${conversation.id} with ${conversation.model}.`)]);
@@ -546,7 +618,7 @@ async function openConversationPicker({
 function pickerForMode(
   mode: TuiMode,
   selectedIndex: number,
-  modelOptions: OllamaModel[],
+  modelOptions: ModelInfo[],
   conversationOptions: ConversationSummary[]
 ):
   | {
@@ -556,11 +628,20 @@ function pickerForMode(
       emptyText: string;
     }
   | undefined {
+  if (mode === "select-provider") {
+    return {
+      title: "Select provider",
+      selectedIndex,
+      emptyText: "No providers configured.",
+      items: formatProviderPickerRows(PROVIDER_IDS).map((label) => ({ label }))
+    };
+  }
+
   if (mode === "select-model") {
     return {
       title: "Select model",
       selectedIndex,
-      emptyText: "No Ollama models installed.",
+      emptyText: "No models are available from the active provider.",
       items: formatModelPickerRows(modelOptions).map((label) => ({ label }))
     };
   }
@@ -612,6 +693,19 @@ function requireArg(value: string, usage: string): void {
   if (!value.trim()) {
     throw new Error(`Usage: ${usage}`);
   }
+}
+
+function parseKeyArgs(args: string): { provider: ProviderId; key?: string; clear: boolean } {
+  const [first, ...rest] = args.trim().split(/\s+/);
+  if (!first) {
+    throw new Error("Usage: /key <provider> [key] or /key <provider> clear");
+  }
+  const provider = parseProviderId(first);
+  const value = rest.join(" ");
+  if (value.toLowerCase() === "clear") {
+    return { provider, clear: true };
+  }
+  return { provider, key: value || undefined, clear: false };
 }
 
 function streamingAssistantId(): string {
